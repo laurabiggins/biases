@@ -1,0 +1,5 @@
+In silico datasets that we want to generate biased by the following attributes:
+
+CG content
+gene length
+number of transcripts

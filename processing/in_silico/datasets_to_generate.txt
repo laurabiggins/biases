@@ -1,5 +1,9 @@
 In silico datasets that we want to generate biased by the following attributes:
 
-CG content
+GC content
 gene length
 number of transcripts
+chromosome
+random genomic position - get closest gene
+gene expression commons
+cross species

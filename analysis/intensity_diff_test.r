@@ -1,5 +1,10 @@
 # Rscript /bi/group/bioinf/Laura_B/bias_analysis/TIDIED/scripts/intensity_diff_test.r  Encode_CSHL_sample_sheet.txt encode_rna_seq_analysis/*gene_names.txt
 
+setwd("D:/projects/biases/gene_count_files/")
+sample.sheet <- "../sample_sheet.txt"
+files <- list.files(pattern="SRR*")
+
+
 args <- commandArgs(trailingOnly = TRUE)
 
 #print(args[1])
@@ -15,11 +20,14 @@ if (length(args)<=1) {
   files <- args[2:length(args)]  
 }
 
-# print(sample.sheet)
-
 # read in the sample sheet
 sample.sheet <- read.delim(sample.sheet)
 
+
+#==========================
+# sorting the sample sheet
+#==========================
+# this is specific for srrs and gsms i.e. the gsm is the group, srrs are individual names
 # split by gsm number
 srrs <- split(sample.sheet$srr, f = sample.sheet$gsm)
 ordered.gsms <- unique(sample.sheet$gsm)
@@ -35,11 +43,6 @@ file.names <- sapply(files.split, tail, n=1)
 regex.matches <- regexpr("(SRR([0-9]+)_)",file.names)
 
 file.names.srr <- substr(file.names, regex.matches, attr(regex.matches,"match.length")-1)
-# remove empty fields
-# file.names.srr <- file.names.srr[file.names.srr!=""]
-
-#print(file.names.srr)
-
 
 
 # we're just going to use the datasets that are in the sample sheet so we'll check that they match the 
@@ -55,10 +58,6 @@ print(file.names.srr[!file.names.srr %in% srr.vector])
 print(paste(sum(!srr.vector %in% file.names.srr)," srrs from the sample sheet that were not found in the file names passed in"))
 print(srr.vector[!srr.vector %in% file.names.srr])
 
-files.to.import <- files[file.names.srr %in% srr.vector]
-
-# import datasets
-datasets <- lapply(files.to.import, read.delim)
 
 
 
@@ -66,7 +65,11 @@ datasets <- lapply(files.to.import, read.delim)
 # functions 
 #############
 
-# collapse list of datasets (which should be replicates) into a dataframe
+#=============================================================================
+# Collapses a list of datasets (which should be replicates) into a dataframe
+# it checks the ensembl ids to make sure the right data is being merged.
+#=============================================================================
+
 collapseToDF <- function(datasets, dataset.names){
  
   # combine the files into 1 data frame
@@ -91,24 +94,82 @@ collapseToDF <- function(datasets, dataset.names){
   return(df)
 } 
 
-getSignificantGenes <- function(dataset.values, gene.names, ensembl.ids, q.cutoff=0.05){
-  # get the p values
-  p.values <- intensityDiffMultipleSamples(dataset.values, ids = ensembl.ids)
+
+#====================================================================================
+# Read count correction
+# a simple method normalising all samples in the dataframe to the largest read count
+#====================================================================================
+
+correctForTotalReadCount <- function(df.counts, log.transform = FALSE){
   
-  # do multiple testing correction
-  q.values <- sapply(p.values, function(x){p.adjust(as.numeric(x), method = "BH")})
+  totalCounts <- colSums(df.counts)
+  #barplot(totalCounts, cex.names=0.7, las =2)
   
-  # just select the rows/genes with q values < 0.05
-  rows.i <- (rowSums(q.values < q.cutoff)) > 0
+  maxCount <- max(totalCounts)
   
-  selected <- q.values[rows.i, ]
+  corrections <- maxCount/totalCounts
   
-  genes <- gene.names[rows.i]
+  correctedCounts <- sweep(df.counts, MARGIN=2, corrections, '*')
   
-  return(data.frame(ids = genes, selected))
-  
+  if(log.transform == TRUE){
+    
+    correctedCounts <- log2(correctedCounts)
+    correctedCounts[correctedCounts==-Inf] <- 0
+  }  
+  #barplot(colSums(correctedCounts), cex.names=0.7, las =2)
+  return(correctedCounts)
 }
 
+#====================================================================
+# Intensity difference function
+# This is the intensity difference function that is used in SeqMonk.
+# It looks at the local distribution to calculate p values
+#====================================================================
+intensity.difference <- function (values.1,values.2, slice.size=500) {
+  
+  average.values <- (values.1+values.2)/2
+  
+  order(average.values) -> sorted.indices
+  
+  order(sorted.indices) -> reverse.lookup
+  
+  sapply(1:length(values.1), function(x) {
+    
+    # if the 2 values are the same, set p-value to 1
+    if((values.1[x] - values.2[x] == 0)){       
+      local.p <- 1
+      return(local.p)     
+    }
+    
+    else{
+      
+      start <- reverse.lookup[x]-(slice.size/2)
+      if (start < 0) start <- 0
+      end <- start+slice.size
+      if (end > length(values.1)) {
+        end <- as.numeric(length(values.1))
+        start <- end-slice.size
+      }
+      
+      local.diffs <- as.double(values.1[sorted.indices[start:end]]-values.2[sorted.indices[start:end]])
+      
+      # We assume a mean of 0 and calculate the sd
+      sqrt(mean(local.diffs*local.diffs)) -> local.sd
+      
+      # Now we work out the p.value for the value we're actually looking at in the context of this distibution    
+      pnorm(values.1[x]-values.2[x],mean=0,sd=local.sd) -> local.p
+      
+      if (local.p > 0.5){
+        local.p <- (1 - local.p)
+      } 
+    }    
+    return (local.p)
+  })
+}
+
+#==========================================================
+# compares each sample in a dataframe to each other sample
+#==========================================================
 intensityDiffMultipleSamples <- function(df, ids){
   
   results <- data.frame(row.names = ids)
@@ -129,18 +190,31 @@ intensityDiffMultipleSamples <- function(df, ids){
 }
 
 
-# This is the intensity difference function that is used in SeqMonk
-intensity.difference <- function (values.1,values.2) {
+#=============================================================
+# performs multiple testing correction and filters by q value
+#=============================================================
+getSignificantGenes <- function(dataset.values, gene.names, ensembl.ids, q.cutoff=0.05){
+  # get the p values
+  p.values <- intensityDiffMultipleSamples(dataset.values, ids = ensembl.ids)
   
-  # log transform
-  v1 <- log2(values.1)
-  v2 <- log2(values.2)
+  # do multiple testing correction
+  q.values <- sapply(p.values, function(x){p.adjust(as.numeric(x), method = "BH")})
   
-  v1[v1==-Inf] <- 0
-  v2[v2==-Inf] <- 0
+  # just select the rows/genes with q values < 0.05
+  rows.i <- (rowSums(q.values < q.cutoff)) > 0
   
-  values.1 <- v1
-  values.2 <- v2
+  selected <- q.values[rows.i, ]
+  
+  genes <- gene.names[rows.i]
+  
+  return(data.frame(ids = genes, selected))
+  
+}
+
+#=================================================
+# calculates z-scores by using local distribution
+#=================================================
+zScores <- function (values.1,values.2, deviation.method="standard", slice.size=500) {
   
   average.values <- (values.1+values.2)/2
   
@@ -150,93 +224,43 @@ intensity.difference <- function (values.1,values.2) {
   
   sapply(1:length(values.1), function(x) {
     
-    # we have a problem when we have a load of 0 values as when we have a sd of 0, the p value is 1, then when we do 1-local.p 
-    #it's converted to 0. If all are set to 0.5, it messes up the q values, so I'm setting them to 1, it seems to work ok.....
+    # if the 2 values are the same, there is no point calculating the z-score
     if((values.1[x] - values.2[x] == 0)){       
-      local.p <- 1
-      return(local.p)     
+      z <- 0
+      return(z)     
     }
     
     else{
-      
-      start <- reverse.lookup[x]-250
+      start <- reverse.lookup[x]-(slice.size/2)
       if (start < 0) start <- 0
-      end <- start+500
+      end <- start+slice.size
       if (end > length(values.1)) {
         end <- as.numeric(length(values.1))
-        start <- end-500
+        start <- end-slice.size
       }
       
       local.diffs <- as.double(values.1[sorted.indices[start:end]]-values.2[sorted.indices[start:end]])
       
-      # We assume a mean of 0 and calculate the sd
-      sqrt(mean(local.diffs*local.diffs)) -> local.sd
+      if(deviation.method=="standard"){
       
-      # Now we work out the p.value for the value we're actually looking at in the context of this distibution    
-      pnorm(values.1[x]-values.2[x],mean=0,sd=local.sd) -> local.p
+        # We assume a mean of 0 and calculate the sd
+        local.dev <- sqrt(mean(local.diffs*local.diffs))
+      }
+      else if(deviation.method=="mad"){
       
-      if (local.p > 0.5){
-        local.p <- (1 - local.p)
-      } 
-    }    
-    return (local.p)
-  }
-  )
-}
+        # median absolute deviation so that the standard deviation doesn't get totally skewed
+        local.dev <- mad(local.diffs, center=0)
+      }
+      # again assuming a mean of 0
+      z <- (values.1[x]-values.2[x]) / local.dev
+    }
+    return (z)
+  })
+}  
+      
 
 
-# this is not clever - if there is a really high no somewhere that will affect the correction
-# just pass in the counts
-correctForTotalReadCount <- function(df.counts){
-  
-  totalCounts <- colSums(df.counts)
-  barplot(totalCounts, cex.names=0.7, las =2)
-  
-  maxCount <- max(totalCounts)
-  
-  corrections <- maxCount/totalCounts
-  
-  correctedCounts <- sweep(df.counts, MARGIN=2, corrections, '*')
-  
-  barplot(colSums(correctedCounts), cex.names=0.7, las =2)
-  
-  return(correctedCounts)
-}
 
-
-# split by gsm number
-srrs <- split(sample.sheet$srr, f = sample.sheet$gsm)
-ordered.gsms <- unique(sample.sheet$gsm)
-gsm.description <- unique(sample.sheet$description)
-gsm.info <- data.frame(gsm = ordered.gsms, description = gsm.description)
-
-print(gsm.info)
-
-
-# extract the SRR number from the file name so we can match it to the sample sheet 
-files.split <- strsplit(files, split="/", fixed=TRUE)
-file.names <- sapply(files.split, tail, n=1)
-regex.matches <- regexpr("(SRR([0-9]+)_)",file.names)
-
-file.names.srr <- substr(file.names, regex.matches, attr(regex.matches,"match.length")-1)
-# remove empty fields
-# file.names.srr <- file.names.srr[file.names.srr!=""]
-
-#print(file.names.srr)
-
-
-# we're just going to use the datasets that are in the sample sheet so we'll check that they match the 
-# files passed in and use only the ones that overlap
-
-srr.vector <- as.character(unlist(srrs))
-
-# file names passed in that are not found in the sample sheet
-print(paste(sum(!file.names.srr %in% srr.vector)," file names passed in that were not found in the sample sheet"))
-print(file.names.srr[!file.names.srr %in% srr.vector])
-
-# srrs from the sample sheet that are not found in the file names passed in
-print(paste(sum(!srr.vector %in% file.names.srr)," srrs from the sample sheet that were not found in the file names passed in"))
-print(srr.vector[!srr.vector %in% file.names.srr])
 
 
 #=====================
@@ -244,7 +268,6 @@ print(srr.vector[!srr.vector %in% file.names.srr])
 #=====================
 
 # this uses lapply so we can deal with multiple gsms. It should also work with a single gsm.
-
 files.to.import <- lapply(srrs, function(x) files[file.names.srr %in% as.character(x)])
 
 # import datasets
@@ -258,6 +281,41 @@ df <- mapply(collapseToDF, datasets, dataset.names, SIMPLIFY = FALSE)
 
 # read count correction
 countData <- lapply(df, function(x) correctForTotalReadCount(x[,3:ncol(x)]))    
+
+#z <- zScores(countData[[1]][,1], countData[[1]][,2])
+z <- zScores(countData[[1]][,1], countData[[1]][,2], deviation.method = "mad")
+
+# we want the top and bottom n genes
+n <- 300
+low.threshold <- z[order(z)][n]
+high.threshold <- z[order(z, decreasing = TRUE)][n]
+
+top.genes <- df[[1]][z >= high.threshold,]
+bottom.genes <- df[[1]][z <= low.threshold,]
+
+#===========================
+# plots for sanity checking
+#===========================
+plot(countData[[1]][,1], countData[[1]][,2], pch=16, col="lightblue")
+points(countData[[1]][z >= high.threshold,1], countData[[1]][z >= high.threshold,2], col="#009999", pch=16)
+points(countData[[1]][z <= low.threshold,1], countData[[1]][z <= low.threshold,2], col="#009999", pch=16)
+lines(x = c(0,20), y = c(0,20))
+low.threshold
+high.threshold
+
+# need to work out how to do the comparisons when we've got multiple replicates
+res <- mapply(countData, df, FUN=function(x,y) getSignificantGenes(x, y[,"gene.name"],y[,"ensembl.id"], q.cutoff = 100), SIMPLIFY = FALSE)
+low.q <- res[[1]][,2] < 0.1
+
+points(countData[[1]][low.q,1], countData[[1]][low.q,2], col="red", pch=16)
+
+# do these plots for the intensity diff test to check that it works properly
+
+
+
+#=================
+# we're going to create a summary stats file with read counts etc in 
+#============================
 
 # or no correction
 #countData <- lapply(df, function(x) x[,3:ncol(x)])

@@ -28,6 +28,8 @@ my $exclude_biotypes;
 my $include_biotypes;
 my $list_biotypes;
 my %gene_biotypes;
+my $no_of_genes;
+my @filtered_set;
 
 my $help;
 my $outfile_suffix = '.genfo';
@@ -46,6 +48,7 @@ my $config_result = GetOptions(
 "exclude_biotypes=s" => \$exclude_biotypes,
 "list_biotypes" => \$list_biotypes,
 "output_file=s" => \$filtered_file_name,
+"number_of_genes=s" => \$no_of_genes,
 "help" => \$help
 );
 die "Could not parse options" unless ($config_result);
@@ -74,7 +77,7 @@ if($max_length && $min_length){
 
 if($max_transcripts && $min_transcripts){
 	if($max_transcripts < $min_transcripts){
-		print "\n max transcripts is smaller than min transcripts, no results will be generated.\n";
+		print "\n max transcripts is smaller than min transcripts, no results will be generated.\n";lstat
 		exit;
 	}
 }
@@ -84,13 +87,13 @@ $file_to_filter = shift @ARGV;
 
 #Check if the read file is compressed and open accordingly
 if($file_to_filter =~ /\.gz$/){
-	print "\nusing file: $file_to_filter\n";
-	print "----------------------------------\n";
+	#print "\nusing file: $file_to_filter\n";
+	#print "----------------------------------\n";
 	open (FILE_IN,"zcat \'$file_to_filter\' |") or die "Can't read $file_to_filter: $!";
 }
 else{
-	print "\nusing file: $file_to_filter\n";
-	print "----------------------------------\n";
+	#print "\nusing file: $file_to_filter\n";
+	#print "----------------------------------\n";
 	open (FILE_IN,$file_to_filter) or die "Can't read $file_to_filter: $!";
 }
 
@@ -270,9 +273,30 @@ LINE_LOOP: while (my $line = <FILE_IN>){
 			next;
 		}	
 	}
-	print OUT "$line";
-}
 	
+	push (@filtered_set, $line);
+	
+}
+
+my @chosen_set;
+
+if($no_of_genes){
+	
+	# randomly select n genes from the filtered set
+	for	(1 .. $no_of_genes){
+		push @chosen_set, splice @filtered_set, rand @filtered_set, 1;
+	}
+}
+else {
+
+	@chosen_set = @filtered_set;
+}		
+
+foreach my $chosen(@chosen_set){
+	print OUT $chosen;
+}	
+	
+
 close FILE_IN;
 close OUT;	
 

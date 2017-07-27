@@ -30,6 +30,7 @@ my $list_biotypes;
 my %gene_biotypes;
 my $no_of_genes;
 my @filtered_set;
+my $dry_run;
 
 my $help;
 my $outfile_suffix = '.genfo';
@@ -49,6 +50,7 @@ my $config_result = GetOptions(
 "list_biotypes" => \$list_biotypes,
 "output_file=s" => \$filtered_file_name,
 "number_of_genes=s" => \$no_of_genes,
+"dry_run" => \$dry_run,
 "help" => \$help
 );
 die "Could not parse options" unless ($config_result);
@@ -77,13 +79,19 @@ if($max_length && $min_length){
 
 if($max_transcripts && $min_transcripts){
 	if($max_transcripts < $min_transcripts){
-		print "\n max transcripts is smaller than min transcripts, no results will be generated.\n";lstat
+		print "\n max transcripts is smaller than min transcripts, no results will be generated.\n";
 		exit;
 	}
 }
 
 
 $file_to_filter = shift @ARGV;
+
+unless($file_to_filter){
+
+	print "gene info file is required \n";
+	exit;
+}	
 
 #Check if the read file is compressed and open accordingly
 if($file_to_filter =~ /\.gz$/){
@@ -278,6 +286,23 @@ LINE_LOOP: while (my $line = <FILE_IN>){
 	
 }
 
+close FILE_IN;
+
+if($dry_run){
+
+	my $counter = 0;
+	
+	foreach my $filtered(@filtered_set){
+		$counter++;
+	}
+	
+	print "$counter genes passed the filter\n";
+	
+close OUT;
+exit;	
+}
+	
+	
 my @chosen_set;
 
 if($no_of_genes){
@@ -297,7 +322,7 @@ foreach my $chosen(@chosen_set){
 }	
 	
 
-close FILE_IN;
+
 close OUT;	
 
 
@@ -358,7 +383,7 @@ Filter options:
   --min_transcripts     minimum number of transcripts per gene
   --max_transcripts     maximum number of transcripts per gene
   --number_of_genes     number of genes that the output file should contain. Filtering of the file takes place first, 
-							then the specified number of genes are randomly selected. Default - all genes. 
+                            then the specified number of genes are randomly selected. Default - all genes. 
   --exclude_biotypes    gene biotypes to exclude - string of biotypes enclosed within quotes and separated by whitespace
                             e.g. --exclude_biotypes "processed_pseudogene another_type protein_coding"
   --include_biotypes    gene biotypes to include - only these biotypes will be included. 
@@ -366,6 +391,7 @@ Filter options:
 
 Other options:
 
+  --dry_run             doesn't create an output file, but provides a count for the number of genes that pass the filter options
   --output_file         output file name, defaults to appending input file name with _filtered.genfo
   --list_biotypes       lists all the gene biotypes along with the number of genes and exits  
   --help                display help and exit

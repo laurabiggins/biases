@@ -347,6 +347,7 @@ __DATA__
 
 Filter options:
 
+ 
   --chromosome          include the specified chromosomes separated by a space "1 3 X"     
   --exclude_chr         exclude the specified chromosomes
   --strand              '+', '-', filter by forward or reverse strand
@@ -356,7 +357,8 @@ Filter options:
   --max_GC              maximum GC content
   --min_transcripts     minimum number of transcripts per gene
   --max_transcripts     maximum number of transcripts per gene
-
+  --number_of_genes     number of genes that the output file should contain. Filtering of the file takes place first, 
+							then the specified number of genes are randomly selected. Default - all genes. 
   --exclude_biotypes    gene biotypes to exclude - string of biotypes enclosed within quotes and separated by whitespace
                             e.g. --exclude_biotypes "processed_pseudogene another_type protein_coding"
   --include_biotypes    gene biotypes to include - only these biotypes will be included. 

@@ -28,6 +28,7 @@ gprofiler.results <- lapply(gene.lists, function(x){
                max_set_size=2000)[,c(3:6,9,10,12)]
 })
 
+
 # all the significant GO categories that were returned for each genelist
 go.ids <- unlist(sapply(gprofiler.results, "[", "term.id"))
 go.terms <- unlist(sapply(gprofiler.results, "[", "term.name"))
@@ -36,13 +37,6 @@ category.size <- unlist(sapply(gprofiler.results, "[", "term.size"))
 # count up how many times each category was identified
 tabled.ids <- table(go.ids)
 tabled.ids <- tabled.ids[order(tabled.ids, decreasing = TRUE)]
-
-# histogram of category frequency
-plot.name <- paste(analysis.name, "histogram.pdf", sep="_")
-title.text <- paste("Frequency of GO categories, no of gene lists =", length(gprofiler.results))
-pdf(file=plot.name)
-hist(tabled.ids, xlab="no of genelists in which GO category was overrepresented", main=title.text)
-dev.off()
 
 unique.locations <- !duplicated(go.ids)
 
@@ -59,3 +53,12 @@ df <- data.frame(id=names(tabled.ids), term=go.terms, freq=as.vector(tabled.ids)
 table.name <-  paste(analysis.name, "res_table.txt", sep="_")
 write.table(x = df, file = table.name, quote = FALSE, sep="\t", row.names = FALSE)
 
+if(nrow(df)>=1){
+
+	# histogram of category frequency
+	plot.name <- paste(analysis.name, "histogram.pdf", sep="_")
+	title.text <- paste("Frequency of GO categories, no of gene lists =", length(gprofiler.results))
+	pdf(file=plot.name)
+	hist(tabled.ids, xlab="no of genelists in which GO category was overrepresented", main=title.text)
+	dev.off()
+}

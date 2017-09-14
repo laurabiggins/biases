@@ -260,9 +260,6 @@ zScores <- function (values.1,values.2, deviation.method="standard", slice.size=
       
 
 
-
-
-
 #=====================
 # Importing the files
 #=====================
@@ -293,9 +290,13 @@ high.threshold <- z[order(z, decreasing = TRUE)][n]
 top.genes <- df[[1]][z >= high.threshold,]
 bottom.genes <- df[[1]][z <= low.threshold,]
 
+writeClipboard(as.character(top.genes$gene.name))
+writeClipboard(as.character(bottom.genes$gene.name))
+
 #===========================
 # plots for sanity checking
 #===========================
+
 plot(countData[[1]][,1], countData[[1]][,2], pch=16, col="lightblue")
 points(countData[[1]][z >= high.threshold,1], countData[[1]][z >= high.threshold,2], col="#009999", pch=16)
 points(countData[[1]][z <= low.threshold,1], countData[[1]][z <= low.threshold,2], col="#009999", pch=16)
@@ -313,9 +314,33 @@ points(countData[[1]][low.q,1], countData[[1]][low.q,2], col="red", pch=16)
 
 
 
-#=================
+#====================================================================
 # we're going to create a summary stats file with read counts etc in 
-#============================
+#====================================================================
+summary.stats <- lapply(df, function(x){
+  
+  colSums(x[,3:ncol(x)])
+  
+})
+
+# boxplot of raw data
+lapply(df, function(x){
+  x <- log2(x[,3:ncol(x)])
+  x[x==-Inf] <- 0
+  boxplot(x)
+})
+
+# boxplot of read count adjusted data
+lapply(countData, function(x){
+  #x <- log2(x[,3:ncol(x)])
+  #x[x==-Inf] <- 0
+  boxplot(x)
+})
+
+
+
+
+#correctedCounts <- sweep(df.counts, MARGIN=2, corrections, '*')  
 
 # or no correction
 #countData <- lapply(df, function(x) x[,3:ncol(x)])

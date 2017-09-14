@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
-# Filters a gene info file (created using the script create_gene_info_from_file.pl)
+# Filters a gene info file (created using the script create_gene_info_from_file.pl which is located here:
+# https://github.com/s-andrews/GOliath/blob/master/processing/gene_info_processing/create_gene_info_file_from_gtf.pl)
 # Various filter options can be set.
 
 # Usage: perl filter_gene_info.pl [options] file_to_filter.genfo 

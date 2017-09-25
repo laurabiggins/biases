@@ -8,13 +8,11 @@
 
 # this script calculates z-scores from local distributions and selects the top n (default 200) changing genes based on the z-scores
 
-rm(list=ls())
-
 library("beanplot")
 
-setwd("D:/projects/biases/gene_count_files/")
-sample_sheet_file <- "../sample_sheet_2reps.txt"
-files <- list.files(pattern="SRR*")
+#setwd("D:/projects/biases/gene_count_files/")
+#sample_sheet_file <- "../sample_sheet_2reps.txt"
+#files <- list.files(pattern="SRR*")
 
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -27,7 +25,7 @@ if (length(args)<=1) {
   stop("Sample sheet and files to be processed must be supplied", call_=FALSE)
 } else if (length(args)>1) {
   
-  sample_sheet <- args[1]
+  sample_sheet_file <- args[1]
   
   files <- args[2:length(args)]  
 }

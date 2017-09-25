@@ -24,7 +24,7 @@ gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NU
 
 # run gProfileR, I don't want all the info that it returns so am selecting relevant columns
 gprofiler.results <- lapply(gene.lists, function(x){
-  gprofiler(x, organism = "mmusculus", exclude_iea = TRUE, src_filter="GO", min_set_size=10, 
+  gprofiler(as.vector(x), organism = "mmusculus", exclude_iea = TRUE, src_filter="GO", min_set_size=10, 
                max_set_size=2000)[,c(3:6,9,10,12)]
 })
 

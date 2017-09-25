@@ -9,14 +9,12 @@
 
 # extract the top 200 differentially expressed genes
 
-
 rm(list=ls())
-
 
 library("beanplot")
 
 setwd("D:/projects/biases/gene_count_files/")
-sample_sheet_file <- "../sample_sheet.txt"
+sample_sheet_file <- "../sample_sheet_2reps.txt"
 files <- list.files(pattern="SRR*")
 
 
@@ -89,7 +87,6 @@ df <- lapply(datasets, function(x){
 })
 
 
-
 # convert to matrices for easier stats
 mat_raw <- lapply(df, function(x){
   the_matrix <- as.matrix(x[,3:ncol(x)])
@@ -105,7 +102,7 @@ mat_log <- lapply(mat_filt, log2)
 # change -Inf values to 0
 mat_log <- lapply(mat_log, function(x){x[x==-Inf] <- 0; return(x)})
 
-# normalise all samples to the sample with the largest read count
+# normalise all samples within a group to the sample with the largest read count
 mat_norm <- lapply(mat_log, function(x){
   totalCounts <- colSums(x)
   corrections <- max(totalCounts)/totalCounts
@@ -238,16 +235,28 @@ dev.off()
 #---------------------------------
 
 # select top 200 genes by z-score to write out
+# these can then be run through gprofiler
 filtered <- lapply(df_ordered, head, n=200)
+
+file_names_out <- paste(names(filtered), "_genes_top200_zscores.txt", sep="")
+
+mapply(filtered, file_names_out, FUN=function(x,y) write.table(x$gene_name, file=y, row.names=FALSE,col.names = FALSE, quote=FALSE))
+
 
 gene_names <- sapply(filtered, `[[`, "gene_name")
 gene_names <- table(unlist(gene_names))
 gene_names <- gene_names[gene_names>=2]
 gene_names <- gene_names[order(gene_names, decreasing = TRUE)]
 
-# TODO: write out the most frequently occurring genes
+# write out genes that appear in >20% of the datasets
+no_of_groups <- length(filtered)
+threshold <- ceiling(no_of_groups*0.2)
 
-# TODO: write out the most differentially expressed genes
+gene_names_filt <- gene_names[gene_names>threshold]
+
+message(paste(length(gene_names_filt), "genes appeared >", threshold, "times"))
+
+write.table(gene_names_filt, file="most_frequently_occurring_genes.txt", quote=FALSE, col.names = FALSE, row.names=FALSE, sep="\t")
 
 
 #-------------------------

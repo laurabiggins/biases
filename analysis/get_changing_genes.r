@@ -8,7 +8,6 @@
 
 # this script calculates z-scores from local distributions and selects the top n (default 200) changing genes based on the z-scores
 
-
 rm(list=ls())
 
 library("beanplot")

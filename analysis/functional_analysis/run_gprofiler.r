@@ -33,9 +33,10 @@ importFiles <- function(no_of_columns){
     stop("files do not contain the expected number of columns")
   }	
   message(paste("imported", length(gene.lists), "files"))
+  gene.lists
 }
 
-importFiles(x)
+gene.lists <- importFiles(x)
 
 # run gProfileR, I don't want all the info that it returns so am selecting relevant columns
 gprofiler.results <- lapply(gene.lists, function(x){

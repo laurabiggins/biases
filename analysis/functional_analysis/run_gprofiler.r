@@ -19,8 +19,17 @@ if (length(args)<=1) {
 print(paste(length(files), "files to import"))
 print(paste("starting", analysis.name, "analysis"))
 
-# import the files
-gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NULL",9)))
+# assuming the files are either genfo format or a simple list of genes
+x <- scan(files[1], nlines=1, what="character")
+if(length(x) == 1){
+  gene.lists <- sapply(files, read.delim)
+}	
+else if(length(x) == 9){
+  gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NULL",9)))
+}
+else{
+  stop("files do not contain the right number of columns")
+}	
 
 # run gProfileR, I don't want all the info that it returns so am selecting relevant columns
 gprofiler.results <- lapply(gene.lists, function(x){

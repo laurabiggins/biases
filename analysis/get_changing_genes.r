@@ -28,7 +28,7 @@ if (length(args)<=1) {
   stop("Sample sheet and files to be processed must be supplied", call_=FALSE)
 } else if (length(args)>1) {
   
-  sample_sheet <- args[1]
+  sample_sheet_file <- args[1]
   
   files <- args[2:length(args)]  
 }

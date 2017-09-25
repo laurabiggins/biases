@@ -21,15 +21,21 @@ print(paste("starting", analysis.name, "analysis"))
 
 # assuming the files are either genfo format or a simple list of genes
 x <- scan(files[1], nlines=1, what="character")
-if(length(x) == 1){
-  gene.lists <- sapply(files, read.delim)
-}	
-else if(length(x) == 9){
-  gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NULL",9)))
+
+importFiles <- function(no_of_columns){
+  if(length(x) == 1){
+    gene.lists <- sapply(files, read.delim)
+  }	
+  else if(length(x) == 9){
+    gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NULL",9)))
+  }
+  else{
+    stop("files do not contain the expected number of columns")
+  }	
+  message(paste("imported", length(gene.lists), "files"))
 }
-else{
-  stop("files do not contain the right number of columns")
-}	
+
+importFiles(x)
 
 # run gProfileR, I don't want all the info that it returns so am selecting relevant columns
 gprofiler.results <- lapply(gene.lists, function(x){

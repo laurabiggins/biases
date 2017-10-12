@@ -1,9 +1,12 @@
 # An r script that runs gProfileR on a set of gene lists
 # Takes gene info files as input and extracts the gene names to use in GO analysis
+
 # Usage: Rscript run_gprofiler.r analysis_name files.genfo
+
 # produces a histogram and results table of any GO categories that came up frequently
 
 library("gProfileR")
+library("ggplot2")
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -19,24 +22,30 @@ if (length(args)<=1) {
 print(paste(length(files), "files to import"))
 print(paste("starting", analysis.name, "analysis"))
 
-# assuming the files are either genfo format or a simple list of genes
-x <- scan(files[1], nlines=1, what="character")
+# we want this to import a list of genes so we need a column named gene_name
+first_line <- scan(files[1], nlines=1, what="character")
 
-importFiles <- function(no_of_columns){
-  if(length(x) == 1){
+
+importFiles <- function(first_line, files){
+  
+  if(!sum(first_line == "gene_name")==1) stop ("couldn't find a column named 'gene_name'")
+  
+  if(length(first_line) == 1){
     gene.lists <- sapply(files, read.delim)
   }	
-  else if(length(x) == 9){
-    gene.lists <- sapply(files, read.delim, colClasses =c("NULL","character",rep("NULL",9)))
-  }
   else{
-    stop("files do not contain the expected number of columns")
-  }	
+    
+    col_no <- which(first_line == "gene_name")
+    
+    cc <- c(rep("NULL",col_no-1),"character",rep("NULL",length(first_line)-col_no))
+    
+    gene.lists <- sapply(files, read.delim, colClasses =cc)
+  }
   message(paste("imported", length(gene.lists), "files"))
   gene.lists
 }
 
-gene.lists <- importFiles(x)
+gene.lists <- importFiles(first_line, files)
 
 # run gProfileR, I don't want all the info that it returns so am selecting relevant columns
 gprofiler.results <- lapply(gene.lists, function(x){
@@ -75,6 +84,7 @@ if(nrow(df)>=1){
 	plot.name <- paste(analysis.name, "histogram.pdf", sep="_")
 	title.text <- paste("Frequency of GO categories, no of gene lists =", length(gprofiler.results))
 	pdf(file=plot.name)
+	ggplot(df, aes(freq))+geom_histogram(binwidth=1)+labs(title=title.text)
 	hist(tabled.ids, xlab="no of genelists in which GO category was overrepresented", main=title.text)
 	dev.off()
 }

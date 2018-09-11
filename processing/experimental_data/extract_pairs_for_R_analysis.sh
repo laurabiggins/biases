@@ -1,9 +1,10 @@
 #!/bin/bash
 # combine the htseq counts into 1 file per pair. Need to look up pair information in the original file from ENA.
-# This is run with no arguments but the folder name needs to be changed 
-FOLDER='/bi/scratch/Summer/batch2'
+# This is run with the folder name as the only argument - the full path of the folder needs to be supplied
+# e.g. usage: ./extract_pairs_for_R_analysis.sh /bi/scratch/Summer/batch3
+FOLDER=$1
 FILE='/bi/scratch/Summer/ena_single_ended_all_info.txt'
-#FILE='head_info.txt'
+
 # the SRR column seems to be constant in the file
 SRR_COLUMN=$(head -n 1 $FILE | awk '{for(i=1;i<=NF;i++){if($i~/^SRR/){print i}}}')
 
@@ -39,7 +40,7 @@ cut -f1 $FILE| uniq | while read -r line;
 				then 
 					#echo "the number of rows match"; 
 				
-					R_input=${srr1}_${srr2}_counts.txt; 
+					R_input=${FOLDER}/${srr1}_${srr2}_counts.txt; 
 					
 					# create a header line
 					echo -e "gene_id\t${srr1}\tgene_id\t${srr2}" > $R_input;

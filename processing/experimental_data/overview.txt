@@ -1,0 +1,74 @@
+#=======================================================================
+# Finding all the RNA-seq data in ena and filtering for paired samples
+#=======================================================================
+
+# download file containing data locations - more details in word file
+tax_eq(10090) AND library_layout="PAIRED" AND instrument_platform="ILLUMINA" AND library_strategy="RNA-Seq"
+
+# pass all the sample info to the commands.sh script - this finds valid pairs of samples 
+./filter_pairs_get_fq_links.sh ena_single_end.txt
+./filter_pairs_get_fq_links.sh ena_paired_end.txt
+
+
+#===================================
+# Download and map the RNA-seq data 
+#===================================
+
+# map the data with clusterflow - pass it the list of ftp addresses
+# select a batch of file names - don't want to set off thousands at once
+sed -n 1,200p ena_single_ended_fq_links.txt > ena_single_ended_fq_links_batch1.txt
+cf --genome GRCm38 --file_list ena_single_ended_fq_links_batch1.txt fastq_hisat2
+
+# to run them all
+#cf --genome GRCm38 --file_list fq_links_test.txt fastq_hisat2
+
+
+#====================================
+# Get counts over genes using htseq 
+#====================================
+
+module load python
+module load samtools
+# run htseq
+for i in *bam; do echo $i; qsub -cwd -V -l h_vmem=16G -N htseq sh ../htseq_wrapper.sh $i;done
+
+#====================================================
+# Find genes that change the most between replicates 
+#====================================================
+
+# get pair info and combine the htseq counts into 1 file per pair - the folder name in the script needs changing to the folder that contains the htseq data to be processed.
+extract_pairs_for_R_analysis.sh
+
+# run the R script
+module load R
+for i in *counts.txt; do qsub -cwd -V -l h_vmem=10G Rscript /bi/scratch/Summer/changingGenes.r $i; done
+
+#combine the png scatter plots in to one pdf
+convert -adjoin *counts_scatter.png scatters.pdf
+
+# to get gene names from Ensembl ids
+# ~/scripts/get_gene_name.sh ENSMUSG00000064367 ENSMUSG00000023944 ENSMUSG00000044285 ENSMUSG00000096544
+for i in *counts_z_scores.txt; do qsub -cwd -V -l h_vmem=10G -N annotate_names_${i} /bi/scratch/Summer/gene_name_wrapper.sh ${i}; done
+
+# extract top 20 genes from each set of replicates and put them all in a file, then use something to count them
+echo "" > top20_genes.txt; for i in *_with_gene_name.txt; do head -n 21 $i | cut -f1 - >> top20_genes.txt; done
+
+# small R script to count how many times the genes appeared
+Rscript ~/scripts/gene_frequencies.r top20_genes.txt
+
+
+#==========
+ clean up 
+#==========
+ 
+rm Rscript.o* annotate_names*txt.o* *_screen.png *counts.txt *counts_z_scores.txt
+
+# clean up some more files - just keep the original fastq for now
+module load python
+multiqc *
+
+rm *bam *trimmed.fq.gz *report*
+
+
+
+
